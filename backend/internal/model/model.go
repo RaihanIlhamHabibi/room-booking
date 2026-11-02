@@ -32,3 +32,9 @@ type CalendarEvent struct {
 	StartsAt time.Time `json:"startsAt"`
 	EndsAt   time.Time `json:"endsAt"`
 }
+
+type ScheduleOption struct {
+	StartsAt time.Time `json:"startsAt"`
+	EndsAt   time.Time `json:"endsAt"`
+	Rooms    []Room    `json:"rooms"`
+}

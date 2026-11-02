@@ -47,12 +47,25 @@ h2 { font-size: 1.35rem; line-height: 1.3; letter-spacing: -.02em; }
 .button:disabled { opacity: .55; cursor: not-allowed; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label { font-weight: 700; }
-.field select, .field textarea { width: 100%; border: 1px solid #a8bbb2; border-radius: 9px; background: white; color: var(--ink); padding: 10px 12px; }
+.field select, .field textarea, .field input { width: 100%; border: 1px solid #a8bbb2; border-radius: 9px; background: white; color: var(--ink); padding: 10px 12px; }
 .field textarea { resize: vertical; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); gap: 14px; }
+.availability-results { display: grid; gap: 12px; }
+.availability-result { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px; }
+.availability-result h3 { margin: 0; font-size: 1.05rem; }
+.attendee-list { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 9px; }
+.attendee-list legend { padding: 0 5px; font-weight: 700; }
+.attendee-list > .muted { margin: 0; }
+.attendee-option { display: flex; align-items: center; gap: 9px; }
+.attendee-option input { width: 18px; height: 18px; accent-color: var(--accent); }
+.schedule-results { display: grid; gap: 14px; }
+.schedule-slot { border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 10px; }
+.schedule-slot h3 { margin: 0; font-size: 1rem; }
+.schedule-rooms { display: flex; flex-wrap: wrap; gap: 8px; }
 .notice { padding: 12px 14px; border-radius: 9px; background: #ebf3ec; color: #285a46; }
 .notice-error { background: #fff0ed; color: #9a352c; }
 .notice-success { background: #e2f3e6; }
 .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
 .login-card { width: min(100%, 480px); padding: 36px; }
-@media (max-width: 700px) { .shell { padding: 28px 16px 60px; } .header-inner { padding: 12px 16px; } .detail-grid { grid-template-columns: 1fr; } .session-name { display: none; } .card { padding: 20px; } .login-card { padding: 24px; } }
+@media (max-width: 700px) { .shell { padding: 28px 16px 60px; } .header-inner { padding: 12px 16px; } .detail-grid { grid-template-columns: 1fr; } .session-name { display: none; } .card { padding: 20px; } .login-card { padding: 24px; } .availability-result { align-items: flex-start; flex-direction: column; } }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; transition-duration: .01ms !important; } }

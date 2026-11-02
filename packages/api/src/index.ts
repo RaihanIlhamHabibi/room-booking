@@ -3,6 +3,10 @@ import type { AuthProvider, BaseRecord, DataProvider } from "@refinedev/core";
 export type Person = { id: string; name: string; email: string };
 export type Room = { id: string; name: string; capacity: number; amenities: string[]; description: string };
 export type Booking = { id: string; roomId: string; organizerId: string; startsAt: string; endsAt: string; purpose: string };
+export type BookingInput = { date: string; startTime: string; endTime: string; purpose: string };
+export type AvailabilityInput = { date: string; startTime: string; endTime: string; attendeeCount: number };
+export type ScheduleInput = { date: string; durationMinutes: number; attendeeIds: string[] };
+export type ScheduleOption = { startsAt: string; endsAt: string; rooms: Room[] };
 export type CalendarEvent = { id: string; userId: string; title: string; startsAt: string; endsAt: string };
 
 export class ApiError extends Error {
@@ -32,6 +36,17 @@ export const api = {
   room: (id: string) => request<Room>(`/rooms/${encodeURIComponent(id)}`),
   updateRoom: (id: string, description: string) => request<Room>(`/rooms/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ description }) }),
   bookings: (roomId: string) => request<{ data: Booking[] }>(`/rooms/${encodeURIComponent(roomId)}/bookings`),
+  createBooking: (roomId: string, input: BookingInput) => request<Booking>(`/rooms/${encodeURIComponent(roomId)}/bookings`, { method: "POST", body: JSON.stringify(input) }),
+  availableRooms: (input: AvailabilityInput) => {
+    const query = new URLSearchParams({
+      date: input.date,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      attendeeCount: String(input.attendeeCount),
+    });
+    return request<{ data: Room[] }>(`/rooms/available?${query.toString()}`);
+  },
+  scheduleRooms: (input: ScheduleInput) => request<{ data: ScheduleOption[] }>("/rooms/schedule", { method: "POST", body: JSON.stringify(input) }),
   calendarEvents: (date?: string) => request<{ data: CalendarEvent[] }>(`/calendar-events${date ? `?date=${encodeURIComponent(date)}` : ""}`),
 };
 
