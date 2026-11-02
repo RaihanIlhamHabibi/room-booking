@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"example.com/room-booking/internal/repository"
@@ -24,14 +25,19 @@ func (h *Handler) Register(e *echo.Echo) {
 	authorized.GET("/session", h.session)
 	authorized.DELETE("/session", h.logout)
 	authorized.GET("/rooms", h.rooms)
+	authorized.GET("/rooms/available", h.availableRooms)
+	authorized.POST("/rooms/schedule", h.schedule)
 	authorized.GET("/rooms/:id", h.room)
 	authorized.PATCH("/rooms/:id", h.updateRoom)
 	authorized.GET("/rooms/:id/bookings", h.bookings)
+	authorized.POST("/rooms/:id/bookings", h.createBooking)
 	authorized.GET("/calendar-events", h.calendarEvents)
 }
 
 func respondError(c echo.Context, err error) error {
 	switch {
+	case errors.Is(err, repository.ErrConflict):
+		return c.JSON(http.StatusConflict, map[string]string{"error": "room is already booked for that time"})
 	case errors.Is(err, repository.ErrNotFound):
 		return c.JSON(http.StatusNotFound, map[string]string{"error": "not found"})
 	case errors.Is(err, service.ErrInvalid):
@@ -133,6 +139,65 @@ func (h *Handler) bookings(c echo.Context) error {
 		return respondError(c, err)
 	}
 	return c.JSON(http.StatusOK, map[string]any{"data": rows})
+}
+
+func (h *Handler) createBooking(c echo.Context) error {
+	var input struct {
+		Date      string `json:"date"`
+		StartTime string `json:"startTime"`
+		EndTime   string `json:"endTime"`
+		Purpose   string `json:"purpose"`
+	}
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+	}
+	user, err := h.service.SessionUser(c.Request().Context(), token(c))
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "sign in required"})
+	}
+	booking, err := h.service.CreateBooking(c.Request().Context(), user.ID, c.Param("id"), input.Date, input.StartTime, input.EndTime, input.Purpose)
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(http.StatusCreated, booking)
+}
+
+func (h *Handler) availableRooms(c echo.Context) error {
+	attendeeCount, err := strconv.Atoi(c.QueryParam("attendeeCount"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "attendeeCount must be a positive integer"})
+	}
+	rooms, err := h.service.AvailableRooms(
+		c.Request().Context(),
+		c.QueryParam("date"),
+		c.QueryParam("startTime"),
+		c.QueryParam("endTime"),
+		attendeeCount,
+	)
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": rooms})
+}
+
+func (h *Handler) schedule(c echo.Context) error {
+	var input struct {
+		Date            string   `json:"date"`
+		DurationMinutes int      `json:"durationMinutes"`
+		AttendeeIDs     []string `json:"attendeeIds"`
+	}
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+	}
+	user, err := h.service.SessionUser(c.Request().Context(), token(c))
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "sign in required"})
+	}
+	options, err := h.service.Schedule(c.Request().Context(), user.ID, input.Date, input.DurationMinutes, input.AttendeeIDs)
+	if err != nil {
+		return respondError(c, err)
+	}
+	return c.JSON(http.StatusOK, map[string]any{"data": options})
 }
 
 func (h *Handler) calendarEvents(c echo.Context) error {

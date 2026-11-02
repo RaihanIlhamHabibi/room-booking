@@ -125,6 +125,10 @@ This is a small application already in progress. Its basic features demonstrate 
 
 Browser requests use `/api`, which the Next.js development server forwards to Kong. Kong routes to the Go API; the API reads and writes PostgreSQL. The backend uses Echo, FX, and GORM. The frontend uses TypeScript, React, Next.js, Refine, and Tailwind. The supplied tests show some of the project's testing tools; extend them where they provide useful confidence.
 
+Members can search for rooms by date, time, and total attendee count from the room directory, then continue to a prefilled booking form. Room bookings are created through `POST /api/rooms/:id/bookings`; `GET /api/rooms/available` returns rooms that meet the requested capacity and have no overlapping booking. Booking times are interpreted in `Asia/Jakarta`. A database exclusion constraint prevents overlapping reservations even when concurrent requests race, and the Compose PostgreSQL volume preserves bookings across ordinary restarts.
+
+The room directory also includes a calendar scheduler. Select one or more participants (the signed-in organizer is included automatically), a date, and a meeting duration in 15-minute increments. `POST /api/rooms/schedule` checks the group calendars and existing room bookings in 15-minute start-time increments from 09:00 through 17:00, returning only times with a room large enough for the full group. Selecting a room carries the suggested date and time into its booking form.
+
 The fixture dates are **May 13–15, 2030**. Times in the application use **Asia/Jakarta**. The optional scheduling task searches within **09:00–17:00** on the chosen date. The fixture dates are intentionally in the future so the starter remains explorable after publication.
 
 ## Checks

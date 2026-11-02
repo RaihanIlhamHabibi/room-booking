@@ -7,10 +7,14 @@ import (
 	"time"
 
 	"example.com/room-booking/internal/model"
+	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
 )
 
-var ErrNotFound = errors.New("not found")
+var (
+	ErrNotFound = errors.New("not found")
+	ErrConflict = errors.New("booking conflicts with an existing reservation")
+)
 
 type Store interface {
 	Users(context.Context) ([]model.User, error)
@@ -22,7 +26,15 @@ type Store interface {
 	Room(context.Context, string) (model.Room, error)
 	UpdateRoomDescription(context.Context, string, string) (model.Room, error)
 	Bookings(context.Context, string) ([]model.Booking, error)
+	CreateBooking(context.Context, model.Booking) error
+	AvailableRooms(context.Context, time.Time, time.Time, int) ([]model.Room, error)
+	ScheduleData(context.Context, time.Time, []string) (ScheduleData, error)
 	CalendarEvents(context.Context, *time.Time) ([]model.CalendarEvent, error)
+}
+
+type ScheduleData struct {
+	CalendarEvents []model.CalendarEvent
+	Bookings       []model.Booking
 }
 
 type GormStore struct{ DB *gorm.DB }
@@ -116,6 +128,58 @@ func (s *GormStore) Bookings(ctx context.Context, roomID string) ([]model.Bookin
 	rows := make([]model.Booking, 0)
 	err := s.DB.WithContext(ctx).Table("bookings").Where("room_id = ?", roomID).Order("starts_at, id").Find(&rows).Error
 	return rows, err
+}
+
+func (s *GormStore) CreateBooking(ctx context.Context, booking model.Booking) error {
+	err := s.DB.WithContext(ctx).Create(&booking).Error
+	var postgresError *pgconn.PgError
+	if errors.As(err, &postgresError) && postgresError.Code == "23P01" {
+		return ErrConflict
+	}
+	return err
+}
+
+func (s *GormStore) AvailableRooms(ctx context.Context, startsAt, endsAt time.Time, attendeeCount int) ([]model.Room, error) {
+	var rows []roomRow
+	err := s.DB.WithContext(ctx).Table("rooms").
+		Where("capacity >= ?", attendeeCount).
+		Where("NOT EXISTS (SELECT 1 FROM bookings WHERE bookings.room_id = rooms.id AND bookings.starts_at < ? AND bookings.ends_at > ?)", endsAt, startsAt).
+		Order("name").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	rooms := make([]model.Room, 0, len(rows))
+	for _, row := range rows {
+		room, err := decodeRoom(row)
+		if err != nil {
+			return nil, err
+		}
+		rooms = append(rooms, room)
+	}
+	return rooms, nil
+}
+
+func (s *GormStore) ScheduleData(ctx context.Context, day time.Time, attendeeIDs []string) (ScheduleData, error) {
+	data := ScheduleData{
+		CalendarEvents: make([]model.CalendarEvent, 0),
+		Bookings:       make([]model.Booking, 0),
+	}
+	dayEnd := day.AddDate(0, 0, 1)
+	if err := s.DB.WithContext(ctx).Table("calendar_events").
+		Where("user_id IN ?", attendeeIDs).
+		Where("starts_at < ? AND ends_at > ?", dayEnd, day).
+		Order("starts_at, id").
+		Find(&data.CalendarEvents).Error; err != nil {
+		return ScheduleData{}, err
+	}
+	if err := s.DB.WithContext(ctx).Table("bookings").
+		Where("starts_at < ? AND ends_at > ?", dayEnd, day).
+		Order("starts_at, id").
+		Find(&data.Bookings).Error; err != nil {
+		return ScheduleData{}, err
+	}
+	return data, nil
 }
 
 func (s *GormStore) CalendarEvents(ctx context.Context, day *time.Time) ([]model.CalendarEvent, error) {
