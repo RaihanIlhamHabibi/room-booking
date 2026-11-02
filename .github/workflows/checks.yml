@@ -1,0 +1,28 @@
+name: Starter checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend check image
+        run: docker compose build web
+      - name: TypeScript checks
+        run: docker compose run --rm --no-deps web corepack pnpm typecheck
+      - name: Frontend tests
+        run: docker compose run --rm --no-deps web corepack pnpm test
+      - name: Frontend production build
+        run: docker compose run --rm --no-deps web corepack pnpm build
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend check image
+        run: docker compose build api
+      - name: Backend tests
+        run: docker compose run --rm --no-deps api go test ./...

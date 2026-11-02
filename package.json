@@ -1,0 +1,11 @@
+{
+  "name": "room-booking-starter",
+  "private": true,
+  "packageManager": "pnpm@11.10.0",
+  "scripts": {
+    "dev": "pnpm --filter @room-booking/web dev",
+    "build": "pnpm --filter @room-booking/web build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  }
+}

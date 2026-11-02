@@ -1,0 +1,92 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-room_booking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-room_booking_local}
+      POSTGRES_DB: ${POSTGRES_DB:-room_booking}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  setup:
+    build:
+      context: ./backend
+    command: ["go", "run", "./cmd/setup"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-room_booking}:${POSTGRES_PASSWORD:-room_booking_local}@postgres:5432/${POSTGRES_DB:-room_booking}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-room_booking}:${POSTGRES_PASSWORD:-room_booking_local}@postgres:5432/${POSTGRES_DB:-room_booking}?sslmode=disable
+      PORT: "8080"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./backend
+          target: /app
+          ignore:
+            - .git/
+            - room-booking
+
+  kong:
+    image: kong:3.9
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8000
+      KONG_ADMIN_LISTEN: "off"
+    volumes:
+      - ./infra/kong/kong.yml:/etc/kong/kong.yml:ro
+    ports:
+      - "127.0.0.1:${KONG_PORT:-18080}:8000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: platforms/web/Dockerfile
+    environment:
+      API_PROXY_URL: http://kong:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:${WEB_PORT:-13000}:3000"
+    depends_on:
+      - kong
+    develop:
+      watch:
+        - action: sync
+          path: ./platforms/web
+          target: /app/platforms/web
+          ignore:
+            - .next/
+        - action: sync
+          path: ./packages
+          target: /app/packages
+          ignore:
+            - '**/node_modules/'
+
+volumes:
+  postgres_data:

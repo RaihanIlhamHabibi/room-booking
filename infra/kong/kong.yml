@@ -1,0 +1,12 @@
+_format_version: "3.0"
+
+services:
+  - name: room-booking-api
+    url: http://api:8080
+    routes:
+      - name: room-booking-api-route
+        paths:
+          - /api
+        strip_path: true
+        protocols:
+          - http
